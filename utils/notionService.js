@@ -4,14 +4,16 @@ class NotionService {
     constructor() {
         this.client = null;
         this.initialized = false;
+        this.initialize();
     }
 
-    initialize() {
+    async initialize() {
         if (this.initialized) {
             return;
         }
 
         const notionApiKey = process.env.NOTION_API_KEY;
+        console.log('NOTION_API_KEY:', notionApiKey);
         if (!notionApiKey) {
             throw new Error('NOTION_API_KEY not found in environment variables');
         }
@@ -42,6 +44,12 @@ class NotionService {
 
             return response.results;
         } catch (error) {
+            if (error.code === 'unauthorized') {
+                throw new Error('Notion API authentication failed. Please check that NOTION_API_KEY is set correctly in your .env file and that the integration has been shared with the required pages.');
+            }
+            if (error.message.includes('is not a valid UUID.')) {
+                throw new Error('Invalid Notion page or database ID provided.');
+            }
             console.error('Error searching Notion pages:', error);
             throw error;
         }
@@ -64,6 +72,12 @@ class NotionService {
 
             return response.results;
         } catch (error) {
+            if (error.code === 'unauthorized') {
+                throw new Error('Notion API authentication failed. Please check that NOTION_API_KEY is set correctly in your .env file and that the integration has been shared with the required pages.');
+            }
+            if (error.message.includes('is not a valid UUID.')) {
+                throw new Error('Invalid Notion page or database ID provided.');
+            }
             console.error('Error searching Notion databases:', error);
             throw error;
         }
@@ -86,6 +100,12 @@ class NotionService {
                 content: blocks
             };
         } catch (error) {
+            if (error.code === 'unauthorized') {
+                throw new Error('Notion API authentication failed. Please check that NOTION_API_KEY is set correctly in your .env file and that the integration has been shared with the required pages.');
+            }
+            if (error.message.includes('is not a valid UUID.')) {
+                throw new Error('Invalid Notion page or database ID provided.');
+            }
             console.error('Error getting Notion page content:', error);
             throw error;
         }
@@ -104,6 +124,12 @@ class NotionService {
 
             return response.results;
         } catch (error) {
+            if (error.code === 'unauthorized') {
+                throw new Error('Notion API authentication failed. Please check that NOTION_API_KEY is set correctly in your .env file and that the integration has been shared with the required pages.');
+            }
+            if (error.message.includes('is not a valid UUID.')) {
+                throw new Error('Invalid Notion page or database ID provided.');
+            }
             console.error('Error getting Notion block children:', error);
             throw error;
         }
@@ -124,6 +150,12 @@ class NotionService {
 
             return response.results;
         } catch (error) {
+            if (error.code === 'unauthorized') {
+                throw new Error('Notion API authentication failed. Please check that NOTION_API_KEY is set correctly in your .env file and that the integration has been shared with the required pages.');
+            }
+            if (error.message.includes('is not a valid UUID.')) {
+                throw new Error('Invalid Notion page or database ID provided.');
+            }
             console.error('Error querying Notion database:', error);
             throw error;
         }
@@ -134,39 +166,49 @@ class NotionService {
 
         for (const block of blocks) {
             switch (block.type) {
-                case 'paragraph':
-                    text += this.extractRichText(block.paragraph.rich_text) + '\n';
-                    break;
-                case 'heading_1':
-                    text += '# ' + this.extractRichText(block.heading_1.rich_text) + '\n';
-                    break;
-                case 'heading_2':
-                    text += '## ' + this.extractRichText(block.heading_2.rich_text) + '\n';
-                    break;
-                case 'heading_3':
-                    text += '### ' + this.extractRichText(block.heading_3.rich_text) + '\n';
-                    break;
-                case 'bulleted_list_item':
-                    text += '- ' + this.extractRichText(block.bulleted_list_item.rich_text) + '\n';
-                    break;
-                case 'numbered_list_item':
-                    text += '1. ' + this.extractRichText(block.numbered_list_item.rich_text) + '\n';
-                    break;
-                case 'to_do':
-                    const checked = block.to_do.checked ? '[x]' : '[ ]';
-                    text += `${checked} ` + this.extractRichText(block.to_do.rich_text) + '\n';
-                    break;
-                case 'quote':
-                    text += '> ' + this.extractRichText(block.quote.rich_text) + '\n';
-                    break;
-                case 'code':
-                    text += '```' + block.code.language + '\n';
-                    text += this.extractRichText(block.code.rich_text) + '\n';
-                    text += '```\n';
-                    break;
-                default:
-                    // Skip unsupported block types
-                    break;
+            case 'paragraph': {
+                text += this.extractRichText(block.paragraph.rich_text) + '\n';
+                break;
+            }
+            case 'heading_1': {
+                text += '# ' + this.extractRichText(block.heading_1.rich_text) + '\n';
+                break;
+            }
+            case 'heading_2': {
+                text += '## ' + this.extractRichText(block.heading_2.rich_text) + '\n';
+                break;
+            }
+            case 'heading_3': {
+                text += '### ' + this.extractRichText(block.heading_3.rich_text) + '\n';
+                break;
+            }
+            case 'bulleted_list_item': {
+                text += '- ' + this.extractRichText(block.bulleted_list_item.rich_text) + '\n';
+                break;
+            }
+            case 'numbered_list_item': {
+                text += '1. ' + this.extractRichText(block.numbered_list_item.rich_text) + '\n';
+                break;
+            }
+            case 'to_do': {
+                const checked = block.to_do.checked ? '[x]' : '[ ]';
+                text += `${checked} ` + this.extractRichText(block.to_do.rich_text) + '\n';
+                break;
+            }
+            case 'quote': {
+                text += '> ' + this.extractRichText(block.quote.rich_text) + '\n';
+                break;
+            }
+            case 'code': {
+                text += '```' + block.code.language + '\n';
+                text += this.extractRichText(block.code.rich_text) + '\n';
+                text += '```\n';
+                break;
+            }
+            default: {
+                // Skip unsupported block types
+                break;
+            }
             }
         }
 
@@ -207,6 +249,12 @@ class NotionService {
 
             return `# ${title}\n\n${text}`;
         } catch (error) {
+            if (error.code === 'unauthorized') {
+                throw new Error('Notion API authentication failed. Please check that NOTION_API_KEY is set correctly in your .env file and that the integration has been shared with the required pages.');
+            }
+            if (error.message.includes('is not a valid UUID.')) {
+                throw new Error('Invalid Notion page or database ID provided.');
+            }
             console.error('Error converting Notion page to markdown:', error);
             throw error;
         }

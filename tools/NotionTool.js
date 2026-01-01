@@ -38,8 +38,10 @@ class NotionTool extends BaseTool {
         // Initialize Notion service
         try {
             notionService.initialize();
+            console.log('NotionTool initialized successfully');
         } catch (error) {
             console.error('Failed to initialize NotionTool:', error.message);
+            console.error('Make sure NOTION_API_KEY is set in your .env file');
         }
     }
 
@@ -48,14 +50,14 @@ class NotionTool extends BaseTool {
 
         try {
             switch (action) {
-                case 'search':
-                    return await this.searchPages(query, limit);
-                case 'get_page':
-                    return await this.getPage(query);
-                case 'query_database':
-                    return await this.queryDatabase(database_id, limit);
-                default:
-                    throw new Error(`Unknown action: ${action}`);
+            case 'search':
+                return await this.searchPages(query, limit);
+            case 'get_page':
+                return await this.getPage(query);
+            case 'query_database':
+                return await this.queryDatabase(database_id, limit);
+            default:
+                throw new Error(`Unknown action: ${action}`);
             }
         } catch (error) {
             console.error('Error in NotionTool.execute:', error);
@@ -74,45 +76,54 @@ class NotionTool extends BaseTool {
             };
         }
 
-        const pages = await notionService.searchPages(query, { limit });
+        try {
+            const pages = await notionService.searchPages(query, { limit });
 
-        if (pages.length === 0) {
+            if (pages.length === 0) {
+                return {
+                    found: 0,
+                    message: 'No pages found matching your query'
+                };
+            }
+
+            const results = [];
+            for (const page of pages) {
+                const title = notionService.extractPageTitle(page);
+                const url = page.url;
+
+                // Get a preview of the page content
+                try {
+                    const { content } = await notionService.getPageContent(page.id);
+                    const preview = notionService.extractTextFromBlocks(content.slice(0, 2));
+
+                    results.push({
+                        id: page.id,
+                        title,
+                        url,
+                        preview: preview.substring(0, 200)
+                    });
+                } catch (error) {
+                    results.push({
+                        id: page.id,
+                        title,
+                        url,
+                        preview: null
+                    });
+                }
+            }
+
             return {
-                found: 0,
-                message: 'No pages found matching your query'
+                found: pages.length,
+                pages: results
+            };
+        } catch (error) {
+            console.error('Error in NotionTool.searchPages:', error.message);
+            return {
+                error: true,
+                message: error.message,
+                code: 'NOTION_SEARCH_ERROR'
             };
         }
-
-        const results = [];
-        for (const page of pages) {
-            const title = notionService.extractPageTitle(page);
-            const url = page.url;
-
-            // Get a preview of the page content
-            try {
-                const { content } = await notionService.getPageContent(page.id);
-                const preview = notionService.extractTextFromBlocks(content.slice(0, 2));
-
-                results.push({
-                    id: page.id,
-                    title,
-                    url,
-                    preview: preview.substring(0, 200)
-                });
-            } catch (error) {
-                results.push({
-                    id: page.id,
-                    title,
-                    url,
-                    preview: null
-                });
-            }
-        }
-
-        return {
-            found: pages.length,
-            pages: results
-        };
     }
 
     async getPage(pageId) {
@@ -123,21 +134,30 @@ class NotionTool extends BaseTool {
             };
         }
 
-        // Extract page ID from URL if provided
-        const pageIdMatch = pageId.match(/notion\.so\/[^\s]*-([a-f0-9]{32})/);
-        const cleanPageId = pageIdMatch ? pageIdMatch[1] : pageId;
+        try {
+            // Extract page ID from URL if provided
+            const pageIdMatch = pageId.match(/notion\.so\/[^\s]*-([a-f0-9]{32})/);
+            const cleanPageId = pageIdMatch ? pageIdMatch[1] : pageId;
 
-        const markdown = await notionService.getPageAsMarkdown(cleanPageId);
+            const markdown = await notionService.getPageAsMarkdown(cleanPageId);
 
-        // Truncate if too long
-        const maxLength = 2000;
-        const truncated = markdown.length > maxLength;
+            // Truncate if too long
+            const maxLength = 2000;
+            const truncated = markdown.length > maxLength;
 
-        return {
-            content: truncated ? markdown.substring(0, maxLength) : markdown,
-            truncated,
-            full_length: markdown.length
-        };
+            return {
+                content: truncated ? markdown.substring(0, maxLength) : markdown,
+                truncated,
+                full_length: markdown.length
+            };
+        } catch (error) {
+            console.error('Error in NotionTool.getPage:', error.message);
+            return {
+                error: true,
+                message: error.message,
+                code: 'NOTION_GET_PAGE_ERROR'
+            };
+        }
     }
 
     async queryDatabase(databaseId, limit) {
@@ -148,18 +168,27 @@ class NotionTool extends BaseTool {
             };
         }
 
-        const results = await notionService.queryDatabase(databaseId, { limit });
+        try {
+            const results = await notionService.queryDatabase(databaseId, { limit });
 
-        const items = results.slice(0, limit).map(item => ({
-            id: item.id,
-            title: notionService.extractPageTitle(item),
-            url: item.url
-        }));
+            const items = results.slice(0, limit).map(item => ({
+                id: item.id,
+                title: notionService.extractPageTitle(item),
+                url: item.url
+            }));
 
-        return {
-            found: results.length,
-            items
-        };
+            return {
+                found: results.length,
+                items
+            };
+        } catch (error) {
+            console.error('Error in NotionTool.queryDatabase:', error.message);
+            return {
+                error: true,
+                message: error.message,
+                code: 'NOTION_QUERY_ERROR'
+            };
+        }
     }
 }
 

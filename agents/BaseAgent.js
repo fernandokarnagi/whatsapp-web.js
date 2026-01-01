@@ -108,8 +108,11 @@ class BaseAgent {
         const toolsEnabled = this.profile.toolsEnabled || this.config.toolsEnabled || false;
         const enabledToolNames = this.profile.enabledTools || this.config.enabledTools || [];
 
+        console.log(`Agent ${this.agentId} calling OpenAI with toolsEnabled=${toolsEnabled} and enabledTools=${enabledToolNames}`);
+
         let tools = [];
         if (toolsEnabled && enabledToolNames.length > 0) {
+            console.log("enabledToolNames: ", enabledToolNames)
             // Get function definitions for enabled tools
             tools = enabledToolNames
                 .map(toolName => {
@@ -119,6 +122,7 @@ class BaseAgent {
                 .filter(def => def !== null);
         }
 
+        console.log(`Agent ${this.agentId} using tools:`, tools);
         const requestOptions = {
             model: this.profile.model,
             messages: messages,
@@ -132,9 +136,13 @@ class BaseAgent {
             requestOptions.tool_choice = 'auto';
         }
 
+        console.log(`Agent ${this.agentId} sending request to OpenAI:`, requestOptions);
+        
         const completion = await this.openai.chat.completions.create(requestOptions);
 
         const responseMessage = completion.choices[0].message;
+
+        console.log(`Agent ${this.agentId} received response from OpenAI:`, responseMessage);
 
         // Check if the model wants to call a tool
         if (responseMessage.tool_calls) {
